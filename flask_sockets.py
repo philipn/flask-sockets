@@ -27,9 +27,10 @@ if 'gevent' in locals():
 
 class SocketMiddleware(object):
 
-    def __init__(self, wsgi_app, socket):
+    def __init__(self, wsgi_app, app, socket):
         self.ws = socket
-        self.app = wsgi_app
+        self.app = app
+        self.wsgi_app = wsgi_app
 
     def __call__(self, environ, start_response):
         adapter = self.ws.url_map.bind_to_environ(environ)
@@ -37,12 +38,14 @@ class SocketMiddleware(object):
             handler, values = adapter.match()
             environment = environ.get('wsgi.websocket')
             if environment:
-                handler(environment, **values)
-                return []
+                with self.app.app_context():
+                    with self.app.request_context(environ):
+                        handler(environment, **values)
+                        return []
             else: 
-                return self.app(environ, start_response)
+                return self.wsgi_app(environ, start_response)
         except NotFound:
-            return self.app(environ, start_response)
+            return self.wsgi_app(environ, start_response)
 
 
 class Sockets(object):
@@ -53,7 +56,7 @@ class Sockets(object):
             self.init_app(app)
 
     def init_app(self, app):
-        app.wsgi_app = SocketMiddleware(app.wsgi_app, self)
+        app.wsgi_app = SocketMiddleware(app.wsgi_app, app, self)
 
     def route(self, rule, **options):
 
