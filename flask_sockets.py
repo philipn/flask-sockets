@@ -35,9 +35,12 @@ class SocketMiddleware(object):
         adapter = self.ws.url_map.bind_to_environ(environ)
         try:
             handler, values = adapter.match()
-            environment = environ['wsgi.websocket']
-            handler(environment, **values)
-            return []
+            environment = environ.get('wsgi.websocket')
+            if environment:
+                handler(environment, **values)
+                return []
+            else: 
+                return self.app(environ, start_response)
         except NotFound:
             return self.app(environ, start_response)
 
